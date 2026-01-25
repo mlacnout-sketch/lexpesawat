@@ -26,7 +26,8 @@ jobs:
 
       - name: Repair Project Structure
         run: |
-          flutter create . --org com.zivpn.netreset --project-name zivpn_net_reset
+          rm -rf android
+          flutter create . --org com.zivpn.netreset --project-name zivpn_net_reset --platforms=android
           
       - name: Get Dependencies
         run: flutter pub get
@@ -37,24 +38,37 @@ jobs:
         
       - name: Configure Signing
         run: |
-          cat <<EOF >> android/app/build.gradle
-
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file("upload-keystore.jks")
-                      storePassword System.getenv("KEY_STORE_PASSWORD")
-                      keyAlias System.getenv("KEY_ALIAS")
-                      keyPassword System.getenv("KEY_PASSWORD")
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
-          EOF
+          # Baca isi build.gradle untuk debug
+          echo "Original build.gradle content:"
+          head -n 20 android/app/build.gradle
+          
+          # Gunakan sed untuk menyisipkan signing config sebelum buildTypes
+          # Kita mencari baris 'buildTypes {' dan menyisipkan blok signingConfigs sebelumnya
+          
+          sed -i '/buildTypes {/i \
+              signingConfigs {\
+                  release {\
+                      storeFile file("upload-keystore.jks")\
+                      storePassword System.getenv("KEY_STORE_PASSWORD")\
+                      keyAlias System.getenv("KEY_ALIAS")\
+                      keyPassword System.getenv("KEY_PASSWORD")\
+                  }\
+              }' android/app/build.gradle
+              
+          # Ubah signingConfig debug menjadi release di dalam buildTypes release
+          # Default flutter create biasanya pakai signingConfig signingConfigs.debug
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle
+          
+          echo "Modified build.gradle content:"
+          cat android/app/build.gradle
+        
+      - name: Build Signed APK
+        run: flutter build apk --release --split-per-abi
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.NETRESET_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.NETRESET_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NETRESET_KEY_ALIAS }}
+          KEY_STORE_PATH: upload-keystore.jks
         
       - name: Build Signed APK
         run: flutter build apk --release --split-per-abi
