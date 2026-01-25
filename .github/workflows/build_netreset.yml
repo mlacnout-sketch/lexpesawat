@@ -24,66 +24,18 @@ jobs:
           flutter-version: '3.27.0'
           channel: 'stable'
 
-      - name: Repair Project Structure
-        run: |
-          rm -rf android
-          flutter create . --org com.zivpn.netreset --project-name zivpn_net_reset --platforms=android
-          
       - name: Get Dependencies
         run: flutter pub get
 
+      # Setup Keystore
       - name: Decode Keystore
         run: |
           echo "${{ secrets.NETRESET_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
         
-      - name: Configure Signing
-        run: |
-          # Baca isi build.gradle untuk debug
-          echo "Original build.gradle content:"
-          head -n 20 android/app/build.gradle
-          
-          # Gunakan sed untuk menyisipkan signing config sebelum buildTypes
-          # Kita mencari baris 'buildTypes {' dan menyisipkan blok signingConfigs sebelumnya
-          
-          # UPDATE minSdkVersion ke 24 (Required by shizuku_api)
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' android/app/build.gradle
-          sed -i 's/minSdkVersion 21/minSdkVersion 24/' android/app/build.gradle
-          
-          sed -i '/buildTypes {/i \
-              signingConfigs {\
-                  release {\
-                      storeFile file("upload-keystore.jks")\
-                      storePassword System.getenv("KEY_STORE_PASSWORD")\
-                      keyAlias System.getenv("KEY_ALIAS")\
-                      keyPassword System.getenv("KEY_PASSWORD")\
-                  }\
-              }' android/app/build.gradle
-              
-          # Ubah signingConfig debug menjadi release di dalam buildTypes release
-          # Default flutter create biasanya pakai signingConfig signingConfigs.debug
-          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' android/app/build.gradle
-          
-          echo "Modified build.gradle content:"
-          cat android/app/build.gradle
-        
+      # Build APK
       - name: Build Signed APK
         run: flutter build apk --release --split-per-abi
         env:
           KEY_STORE_PASSWORD: ${{ secrets.NETRESET_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.NETRESET_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.NETRESET_KEY_ALIAS }}
-          KEY_STORE_PATH: upload-keystore.jks
-        
-      - name: Build Signed APK
-        run: flutter build apk --release --split-per-abi
-        env:
-          KEY_STORE_PASSWORD: ${{ secrets.NETRESET_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.NETRESET_KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.NETRESET_KEY_ALIAS }}
-          KEY_STORE_PATH: upload-keystore.jks
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: zivpn-net-reset-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
