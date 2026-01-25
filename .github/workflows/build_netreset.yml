@@ -1,0 +1,75 @@
+name: Build NetReset APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      # Regenerate Android folder structure (Critical for Termux/incomplete projects)
+      - name: Repair Project Structure
+        run: |
+          flutter create . --org com.zivpn.netreset --project-name zivpn_net_reset
+          
+      - name: Get Dependencies
+        run: flutter pub get
+
+      # Decode Keystore dari Secret
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.NETRESET_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+        
+      # Inject Signing Config ke build.gradle secara dinamis
+      - name: Configure Signing
+        run: |
+          cat <<EOF >> android/app/build.gradle
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("upload-keystore.jks")
+                      storePassword System.getenv("KEY_STORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
+        
+      # Build APK
+      - name: Build Signed APK
+        run: flutter build apk --release --split-per-abi
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.NETRESET_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.NETRESET_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NETRESET_KEY_ALIAS }}
+          KEY_STORE_PATH: upload-keystore.jks
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zivpn-net-reset-apk
+          path: build/app/outputs/flutter-apk/app-release.apk

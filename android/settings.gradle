@@ -1,0 +1,22 @@
+include ':app'
+
+def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+def flutterSdkPath = localPropertiesFile.exists() ?
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        def properties = new Properties()
+        properties.load(reader)
+        properties.getProperty('flutter.sdk')
+    } : null
+
+def flutterProjectRoot = rootProject.projectDir.parentFile.toURI()
+
+gradle.beforeProject { project ->
+    if (project.hasProperty('target-platform') && project.name == 'app') {
+        project.setProperty('target-platform', 'android-arm,android-arm64,android-x64')
+    }
+}
+
+include ":shizuku_api"
+project(":shizuku_api").projectDir = new File("../ios/.symlinks/plugins/shizuku_api/android")
+// Note: Normally Flutter handles plugin inclusion automatically via .flutter-plugins
+// But for manual reconstruction, we rely on standard Flutter build process in CI/CD
