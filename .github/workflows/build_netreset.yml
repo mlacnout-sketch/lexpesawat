@@ -39,3 +39,9 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.NETRESET_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.NETRESET_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.NETRESET_KEY_ALIAS }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zivpn-net-reset-apks
+          path: build/app/outputs/flutter-apk/*.apk
