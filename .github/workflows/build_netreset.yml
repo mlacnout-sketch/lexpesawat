@@ -2,7 +2,7 @@ name: Build NetReset APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
@@ -24,7 +24,6 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
 
-      # Regenerate Android folder structure (Critical for Termux/incomplete projects)
       - name: Repair Project Structure
         run: |
           flutter create . --org com.zivpn.netreset --project-name zivpn_net_reset
@@ -32,12 +31,10 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      # Decode Keystore dari Secret
       - name: Decode Keystore
         run: |
           echo "${{ secrets.NETRESET_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
         
-      # Inject Signing Config ke build.gradle secara dinamis
       - name: Configure Signing
         run: |
           cat <<EOF >> android/app/build.gradle
@@ -59,7 +56,6 @@ jobs:
           }
           EOF
         
-      # Build APK
       - name: Build Signed APK
         run: flutter build apk --release --split-per-abi
         env:
