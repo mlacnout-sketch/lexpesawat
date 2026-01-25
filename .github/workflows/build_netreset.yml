@@ -45,6 +45,10 @@ jobs:
           # Gunakan sed untuk menyisipkan signing config sebelum buildTypes
           # Kita mencari baris 'buildTypes {' dan menyisipkan blok signingConfigs sebelumnya
           
+          # UPDATE minSdkVersion ke 24 (Required by shizuku_api)
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' android/app/build.gradle
+          sed -i 's/minSdkVersion 21/minSdkVersion 24/' android/app/build.gradle
+          
           sed -i '/buildTypes {/i \
               signingConfigs {\
                   release {\
