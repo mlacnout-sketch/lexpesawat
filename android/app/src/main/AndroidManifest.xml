@@ -13,7 +13,6 @@
     <application
         xmlns:tools="http://schemas.android.com/tools"
         android:label="ZIVPN Reset"
-        android:name="io.flutter.app.FlutterApplication"
         android:icon="@mipmap/ic_launcher">
         
         <activity
