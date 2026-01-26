@@ -117,7 +117,7 @@ class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
                 state.message!,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.8),
+                  color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -126,7 +126,7 @@ class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
               Text(
                 'Last check: ${_formatTime(state.lastCheck!)}',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).textTheme.labelSmall?.color?.withOpacity(0.6),
+                  color: Theme.of(context).textTheme.labelSmall?.color?.withValues(alpha: 0.6),
                 ),
               ),
             ],

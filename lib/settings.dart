@@ -262,7 +262,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
                   Text(
                     description,
                     style: textTheme.bodySmall?.copyWith(
-                      color: textTheme.bodySmall?.color?.withOpacity(0.8),
+                      color: textTheme.bodySmall?.color?.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -271,7 +271,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.1),
+                color: colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
