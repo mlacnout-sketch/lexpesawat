@@ -90,6 +90,7 @@ class AutoPilotService {
   AutoPilotService._internal();
 
   final _shizuku = ShizukuApi();
+  final _httpClient = http.Client();
   
   Timer? _timer;
   AutoPilotConfig _config = const AutoPilotConfig();
@@ -97,6 +98,8 @@ class AutoPilotService {
   final _stateController = StreamController<AutoPilotState>.broadcast();
   Stream<AutoPilotState> get stateStream => _stateController.stream;
   
+  bool _isChecking = false;
+
   AutoPilotState _currentState = const AutoPilotState(
     status: AutoPilotStatus.stopped,
     failCount: 0,
@@ -138,16 +141,17 @@ class AutoPilotService {
     } catch (e) {
       // ignore: avoid_print
       print('Failed to save config: $e');
+      rethrow;
     }
   }
 
-  void updateConfig(AutoPilotConfig newConfig) {
+  Future<void> updateConfig(AutoPilotConfig newConfig) async {
     final wasRunning = isRunning;
     if (wasRunning) {
       stop();
     }
     _config = newConfig;
-    _saveConfig(newConfig);
+    await _saveConfig(newConfig);
     if (wasRunning) {
       start();
     }
@@ -231,7 +235,8 @@ class AutoPilotService {
   }
 
   Future<void> _checkAndRecover() async {
-    if (!isRunning) return;
+    if (!isRunning || _isChecking) return;
+    _isChecking = true;
 
     try {
       _updateState(_currentState.copyWith(
@@ -277,27 +282,56 @@ class AutoPilotService {
         status: AutoPilotStatus.error,
         message: 'Check failed: $e',
       ));
+    } finally {
+      _isChecking = false;
     }
   }
 
   Future<bool> checkInternet() async {
     try {
-      final response = await http
+      final response = await _httpClient
           .head(Uri.parse('http://connectivitycheck.gstatic.com/generate_204'))
           .timeout(Duration(seconds: _config.connectionTimeoutSeconds));
 
       return response.statusCode == 204 || response.statusCode == 200;
-    } catch (_) {
+    } catch (e) {
+      print('[AutoPilotService] Internet check failed: $e');
       return false;
     }
   }
 
-    Future<void> _performReset() async {
+  void pause() {
+    _timer?.cancel();
+    _timer = null;
+    print('[AutoPilotService] Paused background timer');
+  }
+
+  void onAppResume() {
+    if (isRunning && (_timer == null || !_timer!.isActive)) {
+      print('[AutoPilotService] Resuming background timer');
+      _timer = Timer.periodic(
+        Duration(seconds: _config.checkIntervalSeconds),
+        (timer) async {
+          await _checkAndRecover();
+        },
+      );
+      // Run an immediate check on resume
+      _checkAndRecover();
+    }
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    _httpClient.close();
+    _stateController.close();
+  }
+
+  Future<void> _performReset({int retryCount = 0}) async {
       try {
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.recovering,
           failCount: 0,
-          message: 'Initiating connection recovery...',
+          message: retryCount > 0 ? 'Retrying reset (${retryCount + 1})...' : 'Initiating connection recovery...',
         ));
   
         await _shizuku.runCommand('cmd connectivity airplane-mode enable');
@@ -321,32 +355,17 @@ class AutoPilotService {
           message: 'Recovery process completed',
         ));
       } catch (e) {
+        if (retryCount < 2) {
+           print('[AutoPilotService] Reset failed, retrying... Error: $e');
+           await Future.delayed(const Duration(seconds: 2));
+           return _performReset(retryCount: retryCount + 1);
+        }
+        
+        final errorMsg = e.toString();
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.error,
-          message: 'Reset error: $e',
+          message: 'Reset error: ${errorMsg.length > 50 ? "${errorMsg.substring(0, 47)}..." : errorMsg}',
         ));
       }
     }
-  void _updateState(AutoPilotState newState) {
-    _currentState = newState;
-    _stateController.add(newState);
-  }
-
-  void dispose() {
-    _timer?.cancel();
-    _stateController.close();
-  }
-
-  void onAppResume() {
-    if (isRunning && (_timer == null || !_timer!.isActive)) {
-        _timer?.cancel();
-        _timer = Timer.periodic(
-          Duration(seconds: _config.checkIntervalSeconds),
-          (timer) async {
-            await _checkAndRecover();
-          },
-        );
-        _checkAndRecover();
-    }
-  }
 }

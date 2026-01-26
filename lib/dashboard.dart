@@ -12,6 +12,7 @@ class AutoPilotDashboard extends StatefulWidget {
 
 class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
   final _service = AutoPilotService();
+  bool _isStarting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -294,16 +295,21 @@ class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
     final now = DateTime.now();
     final difference = now.difference(time);
 
-    if (difference.inSeconds < 60) {
+    if (difference.isNegative) {
+      return 'Just now';
+    } else if (difference.inSeconds < 60) {
       return '${difference.inSeconds}s ago';
     } else if (difference.inMinutes < 60) {
       return '${difference.inMinutes}m ago';
     } else {
-      return '${time.hour}:${time.minute}';
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     }
   }
 
   Future<void> _startService() async {
+    if (_isStarting) return;
+    setState(() => _isStarting = true);
+
     try {
       await _service.start();
     } catch (e) {
@@ -320,6 +326,8 @@ class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
     }
   }
 

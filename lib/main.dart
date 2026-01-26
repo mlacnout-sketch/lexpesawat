@@ -30,9 +30,18 @@ class _ZivpnAppState extends State<ZivpnApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Ensure timer is running if it should be
-      AutoPilotService().onAppResume(); // I need to add this method to Service
+    switch (state) {
+      case AppLifecycleState.resumed:
+        AutoPilotService().onAppResume();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        AutoPilotService().pause();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // No specific action needed for inactive/hidden states
+        break;
     }
   }
 

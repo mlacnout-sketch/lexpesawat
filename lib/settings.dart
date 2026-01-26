@@ -18,22 +18,41 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
     _config = _service.config;
   }
 
-  void _updateConfig(AutoPilotConfig newConfig) {
+  Future<void> _saveConfig() async {
+    try {
+      await _service.updateConfig(_config);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Settings updated successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update settings: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _updateLocalConfig(AutoPilotConfig newConfig) {
     setState(() {
       _config = newConfig;
     });
-    _service.updateConfig(newConfig);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Settings updated successfully'),
-        duration: Duration(seconds: 2),
-      ),
-    );
   }
 
   void _resetToDefaults() {
-    _updateConfig(const AutoPilotConfig());
+    final defaultConfig = const AutoPilotConfig();
+    _updateLocalConfig(defaultConfig);
+    _saveConfig();
   }
 
   @override
@@ -109,7 +128,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
               divisions: 11,
               unit: 'seconds',
               onChanged: (value) {
-                _updateConfig(_config.copyWith(
+                _updateLocalConfig(_config.copyWith(
                   checkIntervalSeconds: value.toInt(),
                 ));
               },
@@ -124,7 +143,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
               divisions: 13,
               unit: 'seconds',
               onChanged: (value) {
-                _updateConfig(_config.copyWith(
+                _updateLocalConfig(_config.copyWith(
                   connectionTimeoutSeconds: value.toInt(),
                 ));
               },
@@ -156,7 +175,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
               divisions: 9,
               unit: 'attempts',
               onChanged: (value) {
-                _updateConfig(_config.copyWith(
+                _updateLocalConfig(_config.copyWith(
                   maxFailCount: value.toInt(),
                 ));
               },
@@ -171,7 +190,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
               divisions: 9,
               unit: 'seconds',
               onChanged: (value) {
-                _updateConfig(_config.copyWith(
+                _updateLocalConfig(_config.copyWith(
                   airplaneModeDelaySeconds: value.toInt(),
                 ));
               },
@@ -186,7 +205,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
               divisions: 5,
               unit: 'seconds',
               onChanged: (value) {
-                _updateConfig(_config.copyWith(
+                _updateLocalConfig(_config.copyWith(
                   recoveryWaitSeconds: value.toInt(),
                 ));
               },
@@ -292,6 +311,7 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
           max: max,
           divisions: divisions,
           onChanged: onChanged,
+          onChangeEnd: (_) => _saveConfig(),
         ),
       ],
     );
