@@ -368,4 +368,9 @@ class AutoPilotService {
         ));
       }
     }
+
+  void _updateState(AutoPilotState newState) {
+    _currentState = newState;
+    _stateController.add(newState);
+  }
 }
