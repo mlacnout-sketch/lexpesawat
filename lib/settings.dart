@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'service.dart';
 
 class AutoPilotSettingsPage extends StatefulWidget {
-  const AutoPilotSettingsPage({Key? key}) : super(key: key);
+  const AutoPilotSettingsPage({super.key});
 
   @override
   State<AutoPilotSettingsPage> createState() => _AutoPilotSettingsPageState();

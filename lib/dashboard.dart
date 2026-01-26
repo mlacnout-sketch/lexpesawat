@@ -4,7 +4,7 @@ import 'service.dart';
 import 'settings.dart';
 
 class AutoPilotDashboard extends StatefulWidget {
-  const AutoPilotDashboard({Key? key}) : super(key: key);
+  const AutoPilotDashboard({super.key});
 
   @override
   State<AutoPilotDashboard> createState() => _AutoPilotDashboardState();

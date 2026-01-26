@@ -118,8 +118,10 @@ class AutoPilotService {
         recoveryWaitSeconds: prefs.getInt('recoveryWaitSeconds') ?? 10,
         autoHealthCheck: prefs.getBool('autoHealthCheck') ?? false,
       );
+      // ignore: avoid_print
       print('Config loaded successfully: $_config');
     } catch (e) {
+      // ignore: avoid_print
       print('Failed to load config: $e');
     }
   }
@@ -134,6 +136,7 @@ class AutoPilotService {
       await prefs.setInt('recoveryWaitSeconds', config.recoveryWaitSeconds);
       await prefs.setBool('autoHealthCheck', config.autoHealthCheck);
     } catch (e) {
+      // ignore: avoid_print
       print('Failed to save config: $e');
     }
   }
@@ -208,8 +211,10 @@ class AutoPilotService {
         'pidof $pkg | xargs -n 1 -I {} sh -c "echo -900 > /proc/{}/oom_score_adj"'
       );
       
+      // ignore: avoid_print
       print('[_strengthenBackground] Anti-Kill Applied');
     } catch (e) {
+      // ignore: avoid_print
       print('[_strengthenBackground] Warning: $e');
     }
   }
