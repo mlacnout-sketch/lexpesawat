@@ -37,6 +37,11 @@ class AutoPilotConfig {
       autoHealthCheck: autoHealthCheck ?? this.autoHealthCheck,
     );
   }
+
+  @override
+  String toString() {
+    return 'AutoPilotConfig(interval: $checkIntervalSeconds, timeout: $connectionTimeoutSeconds, maxFail: $maxFailCount, resetDelay: $airplaneModeDelaySeconds, recoveryWait: $recoveryWaitSeconds, autoHealth: $autoHealthCheck)';
+  }
 }
 
 enum AutoPilotStatus {
