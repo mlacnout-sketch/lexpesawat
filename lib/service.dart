@@ -287,36 +287,41 @@ class AutoPilotService {
     }
   }
 
-  Future<void> _performReset() async {
-    try {
-      _updateState(_currentState.copyWith(
-        status: AutoPilotStatus.recovering,
-        failCount: 0,
-        message: 'Initiating connection recovery...', 
-      ));
-
-      await _shizuku.runCommand('cmd connectivity airplane-mode enable');
-      await Future.delayed(Duration(seconds: _config.airplaneModeDelaySeconds));
-
-      _updateState(_currentState.copyWith(
-        message: 'Restoring connection...', 
-      ));
-
-      await _shizuku.runCommand('cmd connectivity airplane-mode disable');
-      await Future.delayed(Duration(seconds: _config.recoveryWaitSeconds));
-
-      _updateState(_currentState.copyWith(
-        status: AutoPilotStatus.running,
-        message: 'Recovery process completed',
-      ));
-    } catch (e) {
-      _updateState(_currentState.copyWith(
-        status: AutoPilotStatus.error,
-        message: 'Reset error: $e',
-      ));
+    Future<void> _performReset() async {
+      try {
+        _updateState(_currentState.copyWith(
+          status: AutoPilotStatus.recovering,
+          failCount: 0,
+          message: 'Initiating connection recovery...',
+        ));
+  
+        await _shizuku.runCommand('cmd connectivity airplane-mode enable');
+        
+        // Wait for delay, but check if we should abort
+        await Future.delayed(Duration(seconds: _config.airplaneModeDelaySeconds));
+        if (!isRunning) return;
+  
+        _updateState(_currentState.copyWith(
+          message: 'Restoring connection...',
+        ));
+  
+        await _shizuku.runCommand('cmd connectivity airplane-mode disable');
+        
+        // Wait for recovery, check if abort
+        await Future.delayed(Duration(seconds: _config.recoveryWaitSeconds));
+        if (!isRunning) return;
+  
+        _updateState(_currentState.copyWith(
+          status: AutoPilotStatus.running,
+          message: 'Recovery process completed',
+        ));
+      } catch (e) {
+        _updateState(_currentState.copyWith(
+          status: AutoPilotStatus.error,
+          message: 'Reset error: $e',
+        ));
+      }
     }
-  }
-
   void _updateState(AutoPilotState newState) {
     _currentState = newState;
     _stateController.add(newState);
