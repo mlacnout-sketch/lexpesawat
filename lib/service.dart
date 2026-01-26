@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shizuku_api/shizuku_api.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AutoPilotConfig {
   final int checkIntervalSeconds;
@@ -8,7 +9,7 @@ class AutoPilotConfig {
   final int maxFailCount;
   final int airplaneModeDelaySeconds;
   final int recoveryWaitSeconds;
-  final bool autoHealthCheck; 
+  final bool autoHealthCheck;
 
   const AutoPilotConfig({
     this.checkIntervalSeconds = 15,
@@ -16,7 +17,7 @@ class AutoPilotConfig {
     this.maxFailCount = 3,
     this.airplaneModeDelaySeconds = 3,
     this.recoveryWaitSeconds = 10,
-    this.autoHealthCheck = false, // Default false as we don't have proxy logic
+    this.autoHealthCheck = false,
   });
 
   AutoPilotConfig copyWith({
@@ -101,12 +102,44 @@ class AutoPilotService {
   AutoPilotConfig get config => _config;
   bool get isRunning => _currentState.status != AutoPilotStatus.stopped;
 
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _config = AutoPilotConfig(
+        checkIntervalSeconds: prefs.getInt('checkIntervalSeconds') ?? 15,
+        connectionTimeoutSeconds: prefs.getInt('connectionTimeoutSeconds') ?? 5,
+        maxFailCount: prefs.getInt('maxFailCount') ?? 3,
+        airplaneModeDelaySeconds: prefs.getInt('airplaneModeDelaySeconds') ?? 3,
+        recoveryWaitSeconds: prefs.getInt('recoveryWaitSeconds') ?? 10,
+        autoHealthCheck: prefs.getBool('autoHealthCheck') ?? false,
+      );
+      print('Config loaded successfully: $_config');
+    } catch (e) {
+      print('Failed to load config: $e');
+    }
+  }
+
+  Future<void> _saveConfig(AutoPilotConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('checkIntervalSeconds', config.checkIntervalSeconds);
+      await prefs.setInt('connectionTimeoutSeconds', config.connectionTimeoutSeconds);
+      await prefs.setInt('maxFailCount', config.maxFailCount);
+      await prefs.setInt('airplaneModeDelaySeconds', config.airplaneModeDelaySeconds);
+      await prefs.setInt('recoveryWaitSeconds', config.recoveryWaitSeconds);
+      await prefs.setBool('autoHealthCheck', config.autoHealthCheck);
+    } catch (e) {
+      print('Failed to save config: $e');
+    }
+  }
+
   void updateConfig(AutoPilotConfig newConfig) {
     final wasRunning = isRunning;
     if (wasRunning) {
       stop();
     }
     _config = newConfig;
+    _saveConfig(newConfig);
     if (wasRunning) {
       start();
     }
@@ -118,7 +151,7 @@ class AutoPilotService {
     try {
       _updateState(_currentState.copyWith(
         status: AutoPilotStatus.running,
-        message: 'Initializing Shizuku service...',
+        message: 'Initializing Shizuku service...', 
       ));
 
       final isBinderAlive = await _shizuku.pingBinder() ?? false;
@@ -254,14 +287,14 @@ class AutoPilotService {
       _updateState(_currentState.copyWith(
         status: AutoPilotStatus.recovering,
         failCount: 0,
-        message: 'Initiating connection recovery...',
+        message: 'Initiating connection recovery...', 
       ));
 
       await _shizuku.runCommand('cmd connectivity airplane-mode enable');
       await Future.delayed(Duration(seconds: _config.airplaneModeDelaySeconds));
 
       _updateState(_currentState.copyWith(
-        message: 'Restoring connection...',
+        message: 'Restoring connection...', 
       ));
 
       await _shizuku.runCommand('cmd connectivity airplane-mode disable');
