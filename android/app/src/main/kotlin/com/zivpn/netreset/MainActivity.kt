@@ -1,4 +1,4 @@
-package.com.zivpn.netreset
+package com.zivpn.netreset
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity

@@ -1,4 +1,4 @@
-package.com.zivpn.netreset
+package com.zivpn.netreset
 
 import android.app.Notification
 import android.app.NotificationChannel
