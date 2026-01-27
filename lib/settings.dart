@@ -210,6 +210,35 @@ class _AutoPilotSettingsPageState extends State<AutoPilotSettingsPage> {
                 ));
               },
             ),
+            const Divider(height: 32),
+            SwitchListTile(
+              title: const Text('Ping Stabilizer'),
+              subtitle: const Text('Downloads a small file after reset to wake up the connection.'),
+              value: _config.enablePingStabilizer,
+              onChanged: (value) {
+                _updateLocalConfig(_config.copyWith(
+                  enablePingStabilizer: value,
+                ));
+                _saveConfig();
+              },
+            ),
+            if (_config.enablePingStabilizer) ...[
+              const SizedBox(height: 16),
+              _buildSliderSetting(
+                title: 'Download Size',
+                description: 'Total size of dummy file to download',
+                value: _config.stabilizerSizeMb.toDouble(),
+                min: 1,
+                max: 10,
+                divisions: 9,
+                unit: 'MB',
+                onChanged: (value) {
+                  _updateLocalConfig(_config.copyWith(
+                    stabilizerSizeMb: value.toInt(),
+                  ));
+                },
+              ),
+            ],
           ],
         ),
       ),

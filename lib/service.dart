@@ -6,13 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String kAppPackageName = 'com.zivpn.netreset';
 
-class AutoPilotConfig {
-  final int checkIntervalSeconds;
-  final int connectionTimeoutSeconds;
-  final int maxFailCount;
-  final int airplaneModeDelaySeconds;
-  final int recoveryWaitSeconds;
-  final bool autoHealthCheck;
+  final bool enablePingStabilizer;
+  final int stabilizerSizeMb;
 
   const AutoPilotConfig({
     this.checkIntervalSeconds = 15,
@@ -21,6 +16,8 @@ class AutoPilotConfig {
     this.airplaneModeDelaySeconds = 3,
     this.recoveryWaitSeconds = 10,
     this.autoHealthCheck = false,
+    this.enablePingStabilizer = false,
+    this.stabilizerSizeMb = 1,
   });
 
   AutoPilotConfig copyWith({
@@ -30,6 +27,8 @@ class AutoPilotConfig {
     int? airplaneModeDelaySeconds,
     int? recoveryWaitSeconds,
     bool? autoHealthCheck,
+    bool? enablePingStabilizer,
+    int? stabilizerSizeMb,
   }) {
     return AutoPilotConfig(
       checkIntervalSeconds: checkIntervalSeconds ?? this.checkIntervalSeconds,
@@ -38,12 +37,14 @@ class AutoPilotConfig {
       airplaneModeDelaySeconds: airplaneModeDelaySeconds ?? this.airplaneModeDelaySeconds,
       recoveryWaitSeconds: recoveryWaitSeconds ?? this.recoveryWaitSeconds,
       autoHealthCheck: autoHealthCheck ?? this.autoHealthCheck,
+      enablePingStabilizer: enablePingStabilizer ?? this.enablePingStabilizer,
+      stabilizerSizeMb: stabilizerSizeMb ?? this.stabilizerSizeMb,
     );
   }
 
   @override
   String toString() {
-    return 'AutoPilotConfig(interval: $checkIntervalSeconds, timeout: $connectionTimeoutSeconds, maxFail: $maxFailCount, resetDelay: $airplaneModeDelaySeconds, recoveryWait: $recoveryWaitSeconds, autoHealth: $autoHealthCheck)';
+    return 'AutoPilotConfig(interval: $checkIntervalSeconds, timeout: $connectionTimeoutSeconds, maxFail: $maxFailCount, resetDelay: $airplaneModeDelaySeconds, recoveryWait: $recoveryWaitSeconds, autoHealth: $autoHealthCheck, stabilizer: $enablePingStabilizer, size: $stabilizerSizeMb)';
   }
 }
 
@@ -129,6 +130,8 @@ class AutoPilotService {
         airplaneModeDelaySeconds: prefs.getInt('airplaneModeDelaySeconds') ?? 3,
         recoveryWaitSeconds: prefs.getInt('recoveryWaitSeconds') ?? 10,
         autoHealthCheck: prefs.getBool('autoHealthCheck') ?? false,
+        enablePingStabilizer: prefs.getBool('enablePingStabilizer') ?? false,
+        stabilizerSizeMb: prefs.getInt('stabilizerSizeMb') ?? 1,
       );
       // ignore: avoid_print
       print('Config loaded successfully: $_config');
@@ -147,6 +150,8 @@ class AutoPilotService {
       await prefs.setInt('airplaneModeDelaySeconds', config.airplaneModeDelaySeconds);
       await prefs.setInt('recoveryWaitSeconds', config.recoveryWaitSeconds);
       await prefs.setBool('autoHealthCheck', config.autoHealthCheck);
+      await prefs.setBool('enablePingStabilizer', config.enablePingStabilizer);
+      await prefs.setInt('stabilizerSizeMb', config.stabilizerSizeMb);
     } catch (e) {
       // ignore: avoid_print
       print('Failed to save config: $e');
@@ -376,6 +381,36 @@ class AutoPilotService {
     _stateController.close();
   }
 
+  Future<void> _runPingStabilizer() async {
+    if (!_config.enablePingStabilizer) return;
+
+    try {
+      _updateState(_currentState.copyWith(
+        message: 'Stabilizing connection (Traffic: ${_config.stabilizerSizeMb}MB)...',
+      ));
+
+      // Streaming Download to save RAM
+      for (int i = 0; i < _config.stabilizerSizeMb; i++) {
+        if (!isRunning) break; 
+        
+        final request = http.Request('GET', Uri.parse('http://speedtest.tele2.net/1MB.zip'));
+        final response = await _httpClient.send(request).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          // Drain the stream without storing it
+          await for (var _ in response.stream) {
+            if (!isRunning) break;
+            // Bytes are discarded here
+          }
+        }
+      }
+      
+      print('[PingStabilizer] Traffic simulation completed.');
+    } catch (e) {
+      print('[PingStabilizer] Warning: $e');
+    }
+  }
+
   Future<void> _performReset({int retryCount = 0}) async {
       try {
         _updateState(_currentState.copyWith(
@@ -400,6 +435,9 @@ class AutoPilotService {
         // Wait for recovery, check if abort
         await Future.delayed(Duration(seconds: _config.recoveryWaitSeconds));
         if (!isRunning) return;
+
+        // Run Stabilizer (Dummy Download)
+        await _runPingStabilizer();
   
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.running,
