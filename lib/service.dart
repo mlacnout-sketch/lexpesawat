@@ -6,6 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String kAppPackageName = 'com.zivpn.netreset';
 
+class AutoPilotConfig {
+  final int checkIntervalSeconds;
+  final int connectionTimeoutSeconds;
+  final int maxFailCount;
+  final int airplaneModeDelaySeconds;
+  final int recoveryWaitSeconds;
+  final bool autoHealthCheck;
   final bool enablePingStabilizer;
   final int stabilizerSizeMb;
 
@@ -59,7 +66,7 @@ enum AutoPilotStatus {
 class AutoPilotState {
   final AutoPilotStatus status;
   final int failCount;
-  final int consecutiveResets; // New field
+  final int consecutiveResets; 
   final String? message;
   final DateTime? lastCheck;
   final bool hasInternet;
@@ -67,7 +74,7 @@ class AutoPilotState {
   const AutoPilotState({
     required this.status,
     required this.failCount,
-    this.consecutiveResets = 0, // Default 0
+    this.consecutiveResets = 0, 
     this.message,
     this.lastCheck,
     required this.hasInternet,
@@ -133,10 +140,8 @@ class AutoPilotService {
         enablePingStabilizer: prefs.getBool('enablePingStabilizer') ?? false,
         stabilizerSizeMb: prefs.getInt('stabilizerSizeMb') ?? 1,
       );
-      // ignore: avoid_print
       print('Config loaded successfully: $_config');
     } catch (e) {
-      // ignore: avoid_print
       print('Failed to load config: $e');
     }
   }
@@ -153,7 +158,6 @@ class AutoPilotService {
       await prefs.setBool('enablePingStabilizer', config.enablePingStabilizer);
       await prefs.setInt('stabilizerSizeMb', config.stabilizerSizeMb);
     } catch (e) {
-      // ignore: avoid_print
       print('Failed to save config: $e');
       rethrow;
     }
@@ -224,22 +228,15 @@ class AutoPilotService {
 
   Future<void> _strengthenBackground() async {
     try {
-      // Use current package name
       const pkg = kAppPackageName; 
-      
       await _shizuku.runCommand('dumpsys deviceidle whitelist +$pkg');
       await _shizuku.runCommand('cmd activity set-inactive $pkg false');
       await _shizuku.runCommand('cmd activity set-standby-bucket $pkg active');
-      
-      // OOM Score Logic
       await _shizuku.runCommand(
         'pidof $pkg | xargs -n 1 -I {} sh -c "echo -900 > /proc/{}/oom_score_adj"'
       );
-      
-      // ignore: avoid_print
       print('[_strengthenBackground] Anti-Kill Applied');
     } catch (e) {
-      // ignore: avoid_print
       print('[_strengthenBackground] Warning: $e');
     }
   }
@@ -280,7 +277,7 @@ class AutoPilotService {
           _updateState(_currentState.copyWith(
             status: AutoPilotStatus.running,
             failCount: 0,
-            consecutiveResets: 0, // Reset counter on success
+            consecutiveResets: 0, 
             hasInternet: true,
             message: 'Internet connection stable',
           ));
@@ -302,13 +299,12 @@ class AutoPilotService {
         ));
 
         if (newFailCount >= _config.maxFailCount) {
-          // Check for infinite loop (Battery Saver)
           if (_currentState.consecutiveResets >= 5) {
              _updateState(_currentState.copyWith(
                status: AutoPilotStatus.stopped,
                message: 'Gave up: Internet unstable after 5 resets.',
              ));
-             stop(); // EMERGENCY STOP
+             stop(); 
           } else {
              await _performReset();
           }
@@ -344,23 +340,17 @@ class AutoPilotService {
   }
 
   void onAppResume() {
-    // Prevent UI freeze: Wait for the first frame to render before running heavy logic
     Future.delayed(const Duration(milliseconds: 800), () async {
       print('[AutoPilotService] App resumed. Performing health check...');
-      
-      // 1. Check Shizuku Binder Health
       try {
         final isBinderAlive = await _shizuku.pingBinder() ?? false;
         if (!isBinderAlive) {
-          print('[AutoPilotService] Warning: Shizuku binder died. Trying to recover...');
-          // Logic to re-init or notify UI could go here. 
-          // For now, we just flag it.
+          print('[AutoPilotService] Warning: Shizuku binder died.');
         }
       } catch (e) {
          print('[AutoPilotService] Binder check failed: $e');
       }
 
-      // 2. Resume Timer if needed (and if service should be running)
       if (isRunning && (_timer == null || !_timer!.isActive)) {
         print('[AutoPilotService] Restarting background timer...');
         _timer = Timer.periodic(
@@ -369,7 +359,6 @@ class AutoPilotService {
             await _checkAndRecover();
           },
         );
-        // Run an immediate check safely
         _checkAndRecover();
       }
     });
@@ -389,7 +378,6 @@ class AutoPilotService {
         message: 'Stabilizing connection (Traffic: ${_config.stabilizerSizeMb}MB)...',
       ));
 
-      // Streaming Download to save RAM
       for (int i = 0; i < _config.stabilizerSizeMb; i++) {
         if (!isRunning) break; 
         
@@ -397,14 +385,11 @@ class AutoPilotService {
         final response = await _httpClient.send(request).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
-          // Drain the stream without storing it
           await for (var _ in response.stream) {
             if (!isRunning) break;
-            // Bytes are discarded here
           }
         }
       }
-      
       print('[PingStabilizer] Traffic simulation completed.');
     } catch (e) {
       print('[PingStabilizer] Warning: $e');
@@ -416,13 +401,11 @@ class AutoPilotService {
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.recovering,
           failCount: 0,
-          consecutiveResets: _currentState.consecutiveResets + 1, // Increment here
+          consecutiveResets: _currentState.consecutiveResets + 1,
           message: retryCount > 0 ? 'Retrying reset (${retryCount + 1})...' : 'Resetting network (Attempt #${_currentState.consecutiveResets + 1})...',
         ));
   
         await _shizuku.runCommand('cmd connectivity airplane-mode enable');
-        
-        // Wait for delay, but check if we should abort
         await Future.delayed(Duration(seconds: _config.airplaneModeDelaySeconds));
         if (!isRunning) return;
   
@@ -431,12 +414,9 @@ class AutoPilotService {
         ));
   
         await _shizuku.runCommand('cmd connectivity airplane-mode disable');
-        
-        // Wait for recovery, check if abort
         await Future.delayed(Duration(seconds: _config.recoveryWaitSeconds));
         if (!isRunning) return;
 
-        // Run Stabilizer (Dummy Download)
         await _runPingStabilizer();
   
         _updateState(_currentState.copyWith(
