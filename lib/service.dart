@@ -373,26 +373,51 @@ class AutoPilotService {
   Future<void> _runPingStabilizer() async {
     if (!_config.enablePingStabilizer) return;
 
+    final client = http.Client(); // Use fresh client for new network state
+
     try {
       _updateState(_currentState.copyWith(
-        message: 'Stabilizing connection (Traffic: ${_config.stabilizerSizeMb}MB)...',
+        message: 'Stabilizing: Warming up connection...',
       ));
+      
+      // Allow modem/DNS to settle after airplane mode toggle
+      await Future.delayed(const Duration(seconds: 2));
 
-      for (int i = 0; i < _config.stabilizerSizeMb; i++) {
+      for (int i = 1; i <= _config.stabilizerSizeMb; i++) {
         if (!isRunning) break; 
         
-        final request = http.Request('GET', Uri.parse('http://speedtest.tele2.net/1MB.zip'));
-        final response = await _httpClient.send(request).timeout(const Duration(seconds: 15));
+        try {
+          _updateState(_currentState.copyWith(
+            message: 'Stabilizing: Downloading chunk $i/${_config.stabilizerSizeMb} MB...',
+          ));
 
-        if (response.statusCode == 200) {
-          await for (var _ in response.stream) {
-            if (!isRunning) break;
+          final request = http.Request('GET', Uri.parse('http://speedtest.tele2.net/1MB.zip'));
+          // Disable keep-alive to force fresh connection per chunk
+          request.headers['Connection'] = 'close'; 
+          
+          final response = await client.send(request).timeout(const Duration(seconds: 15));
+
+          if (response.statusCode == 200) {
+            await for (var _ in response.stream) {
+              if (!isRunning) break;
+              // Discard bytes
+            }
+          } else {
+             print('[PingStabilizer] Chunk $i failed: ${response.statusCode}');
+             // Small delay on fail before next chunk
+             await Future.delayed(const Duration(seconds: 1));
           }
+        } catch (e) {
+          print('[PingStabilizer] Chunk $i error: $e');
+          await Future.delayed(const Duration(seconds: 1));
         }
       }
-      print('[PingStabilizer] Traffic simulation completed.');
+      
+      print('[PingStabilizer] Sequence completed.');
     } catch (e) {
-      print('[PingStabilizer] Warning: $e');
+      print('[PingStabilizer] Critical error: $e');
+    } finally {
+      client.close();
     }
   }
 
@@ -417,7 +442,16 @@ class AutoPilotService {
         await Future.delayed(Duration(seconds: _config.recoveryWaitSeconds));
         if (!isRunning) return;
 
-        await _runPingStabilizer();
+        // Verify connection before stabilizing
+        _updateState(_currentState.copyWith(message: 'Verifying connectivity...'));
+        final isConnected = await checkInternet();
+
+        if (isConnected) {
+           // Connection is back! Run Stabilizer to wake it up fully.
+           await _runPingStabilizer();
+        } else {
+           print('[AutoPilotService] Skip stabilizer: No internet after reset.');
+        }
   
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.running,
