@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'service.dart';
 import 'settings.dart';
@@ -13,49 +14,76 @@ class AutoPilotDashboard extends StatefulWidget {
 class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
   final _service = AutoPilotService();
   bool _isStarting = false;
+  static const _platform = MethodChannel('com.zivpn.netreset/service');
+
+  Future<void> _minimizeApp() async {
+    try {
+      await _platform.invokeMethod('minimizeApp');
+    } catch (e) {
+      print("Failed to minimize: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ZIVPN NetReset'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AutoPilotSettingsPage(),
+    return StreamBuilder<AutoPilotState>(
+      stream: _service.stateStream,
+      initialData: _service.currentState,
+      builder: (context, snapshot) {
+        final state = snapshot.data ?? _service.currentState;
+        final isRunning = state.status != AutoPilotStatus.stopped;
+
+        return PopScope(
+          canPop: !isRunning, // Only allow exit if STOPPED
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+            
+            // If running, minimize instead of exit
+            if (isRunning) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('App minimized to background (Monitoring active)'),
+                  duration: Duration(seconds: 1),
                 ),
               );
-            },
-          ),
-        ],
-      ),
-      body: StreamBuilder<AutoPilotState>(
-        stream: _service.stateStream,
-        initialData: _service.currentState,
-        builder: (context, snapshot) {
-          final state = snapshot.data ?? _service.currentState;
-          
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStatusCard(state),
-                const SizedBox(height: 16),
-                _buildControlCard(state),
-                const SizedBox(height: 16),
-                _buildConfigurationCard(),
-                const SizedBox(height: 16),
-                _buildConnectionStatusCard(state),
+              await _minimizeApp();
+            }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('ZIVPN NetReset'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AutoPilotSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
-          );
-        },
-      ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatusCard(state),
+                  const SizedBox(height: 16),
+                  _buildControlCard(state),
+                  const SizedBox(height: 16),
+                  _buildConfigurationCard(),
+                  const SizedBox(height: 16),
+                  _buildConnectionStatusCard(state),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

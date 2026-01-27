@@ -23,6 +23,9 @@ class MainActivity: FlutterActivity() {
                 val serviceIntent = Intent(this, KeepAliveService::class.java)
                 stopService(serviceIntent)
                 result.success("Stopped")
+            } else if (call.method == "minimizeApp") {
+                moveTaskToBack(true)
+                result.success("Minimized")
             } else {
                 result.notImplemented()
             }
