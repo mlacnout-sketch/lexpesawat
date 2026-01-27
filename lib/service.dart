@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:shizuku_api/shizuku_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const String kAppPackageName = 'com.zivpn.netreset';
+
 class AutoPilotConfig {
   final int checkIntervalSeconds;
   final int connectionTimeoutSeconds;
@@ -56,6 +58,7 @@ enum AutoPilotStatus {
 class AutoPilotState {
   final AutoPilotStatus status;
   final int failCount;
+  final int consecutiveResets; // New field
   final String? message;
   final DateTime? lastCheck;
   final bool hasInternet;
@@ -63,6 +66,7 @@ class AutoPilotState {
   const AutoPilotState({
     required this.status,
     required this.failCount,
+    this.consecutiveResets = 0, // Default 0
     this.message,
     this.lastCheck,
     required this.hasInternet,
@@ -71,6 +75,7 @@ class AutoPilotState {
   AutoPilotState copyWith({
     AutoPilotStatus? status,
     int? failCount,
+    int? consecutiveResets,
     String? message,
     DateTime? lastCheck,
     bool? hasInternet,
@@ -78,6 +83,7 @@ class AutoPilotState {
     return AutoPilotState(
       status: status ?? this.status,
       failCount: failCount ?? this.failCount,
+      consecutiveResets: consecutiveResets ?? this.consecutiveResets,
       message: message ?? this.message,
       lastCheck: lastCheck ?? this.lastCheck,
       hasInternet: hasInternet ?? this.hasInternet,
@@ -105,6 +111,7 @@ class AutoPilotService {
   AutoPilotState _currentState = const AutoPilotState(
     status: AutoPilotStatus.stopped,
     failCount: 0,
+    consecutiveResets: 0,
     hasInternet: true,
   );
 
@@ -213,7 +220,7 @@ class AutoPilotService {
   Future<void> _strengthenBackground() async {
     try {
       // Use current package name
-      const pkg = 'com.zivpn.netreset'; 
+      const pkg = kAppPackageName; 
       
       await _shizuku.runCommand('dumpsys deviceidle whitelist +$pkg');
       await _shizuku.runCommand('cmd activity set-inactive $pkg false');
@@ -264,12 +271,13 @@ class AutoPilotService {
       final hasInternet = await checkInternet();
 
       if (hasInternet) {
-        if (_currentState.failCount > 0) {
+        if (_currentState.failCount > 0 || _currentState.consecutiveResets > 0) {
           _updateState(_currentState.copyWith(
             status: AutoPilotStatus.running,
             failCount: 0,
+            consecutiveResets: 0, // Reset counter on success
             hasInternet: true,
-            message: 'Internet connection recovered',
+            message: 'Internet connection stable',
           ));
         } else {
           _updateState(_currentState.copyWith(
@@ -289,7 +297,16 @@ class AutoPilotService {
         ));
 
         if (newFailCount >= _config.maxFailCount) {
-          await _performReset();
+          // Check for infinite loop (Battery Saver)
+          if (_currentState.consecutiveResets >= 5) {
+             _updateState(_currentState.copyWith(
+               status: AutoPilotStatus.stopped,
+               message: 'Gave up: Internet unstable after 5 resets.',
+             ));
+             stop(); // EMERGENCY STOP
+          } else {
+             await _performReset();
+          }
         }
       }
     } catch (e) {
@@ -322,17 +339,35 @@ class AutoPilotService {
   }
 
   void onAppResume() {
-    if (isRunning && (_timer == null || !_timer!.isActive)) {
-      print('[AutoPilotService] Resuming background timer');
-      _timer = Timer.periodic(
-        Duration(seconds: _config.checkIntervalSeconds),
-        (timer) async {
-          await _checkAndRecover();
-        },
-      );
-      // Run an immediate check on resume
-      _checkAndRecover();
-    }
+    // Prevent UI freeze: Wait for the first frame to render before running heavy logic
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      print('[AutoPilotService] App resumed. Performing health check...');
+      
+      // 1. Check Shizuku Binder Health
+      try {
+        final isBinderAlive = await _shizuku.pingBinder() ?? false;
+        if (!isBinderAlive) {
+          print('[AutoPilotService] Warning: Shizuku binder died. Trying to recover...');
+          // Logic to re-init or notify UI could go here. 
+          // For now, we just flag it.
+        }
+      } catch (e) {
+         print('[AutoPilotService] Binder check failed: $e');
+      }
+
+      // 2. Resume Timer if needed (and if service should be running)
+      if (isRunning && (_timer == null || !_timer!.isActive)) {
+        print('[AutoPilotService] Restarting background timer...');
+        _timer = Timer.periodic(
+          Duration(seconds: _config.checkIntervalSeconds),
+          (timer) async {
+            await _checkAndRecover();
+          },
+        );
+        // Run an immediate check safely
+        _checkAndRecover();
+      }
+    });
   }
 
   void dispose() {
@@ -346,7 +381,8 @@ class AutoPilotService {
         _updateState(_currentState.copyWith(
           status: AutoPilotStatus.recovering,
           failCount: 0,
-          message: retryCount > 0 ? 'Retrying reset (${retryCount + 1})...' : 'Initiating connection recovery...',
+          consecutiveResets: _currentState.consecutiveResets + 1, // Increment here
+          message: retryCount > 0 ? 'Retrying reset (${retryCount + 1})...' : 'Resetting network (Attempt #${_currentState.consecutiveResets + 1})...',
         ));
   
         await _shizuku.runCommand('cmd connectivity airplane-mode enable');

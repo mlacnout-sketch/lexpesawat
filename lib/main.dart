@@ -30,6 +30,7 @@ class _ZivpnAppState extends State<ZivpnApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    print('[Main] Lifecycle changed: $state');
     switch (state) {
       case AppLifecycleState.resumed:
         AutoPilotService().onAppResume();
@@ -42,6 +43,7 @@ class _ZivpnAppState extends State<ZivpnApp> with WidgetsBindingObserver {
       case AppLifecycleState.detached:
         // Detached usually means the engine is being destroyed.
         // We can try to stop here to be clean, or let it die with the process.
+        print('[Main] App detached.');
         AutoPilotService().pause();
         break;
       case AppLifecycleState.inactive:

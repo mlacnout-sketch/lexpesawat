@@ -29,10 +29,20 @@ android {
 
     signingConfigs {
         release {
-            storeFile = file("upload-keystore.jks")
-            storePassword = System.getenv("KEY_STORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
+            if (file("upload-keystore.jks").exists()) {
+                storeFile = file("upload-keystore.jks")
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else if (file("../../zivpn_net_reset.jks").exists()) {
+                // Local Build (Termux)
+                storeFile = file("../../zivpn_net_reset.jks")
+                // Assumption: You will provide these env vars or create a properties file locally
+                // For safety in this CLI, we will expect ENV vars or a prompt
+                storePassword = System.getenv("KEY_STORE_PASSWORD") ?: "android"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "android"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+            }
         }
     }
 
