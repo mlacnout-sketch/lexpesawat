@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shizuku_api/shizuku_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -91,6 +92,7 @@ class AutoPilotService {
 
   final _shizuku = ShizukuApi();
   final _httpClient = http.Client();
+  static const _platform = MethodChannel('com.zivpn.netreset/service');
   
   Timer? _timer;
   AutoPilotConfig _config = const AutoPilotConfig();
@@ -178,6 +180,13 @@ class AutoPilotService {
         }
       }
 
+      // Start Native Foreground Service
+      try {
+        await _platform.invokeMethod('startForeground');
+      } catch (e) {
+        print('[AutoPilotService] Failed to start foreground service: $e');
+      }
+
       await _strengthenBackground();
 
       _updateState(_currentState.copyWith(
@@ -224,6 +233,12 @@ class AutoPilotService {
   }
 
   void stop() {
+    try {
+      _platform.invokeMethod('stopForeground');
+    } catch (e) {
+      print('[AutoPilotService] Failed to stop foreground service: $e');
+    }
+
     _timer?.cancel();
     _timer = null;
     

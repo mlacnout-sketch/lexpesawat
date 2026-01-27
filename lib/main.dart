@@ -35,7 +35,13 @@ class _ZivpnAppState extends State<ZivpnApp> with WidgetsBindingObserver {
         AutoPilotService().onAppResume();
         break;
       case AppLifecycleState.paused:
+        // Keep running in background!
+        // The service has its own "Anti-Kill" strategy (whitelist/oom_adj).
+        print('[Main] App paused, but keeping Watchdog alive.');
+        break;
       case AppLifecycleState.detached:
+        // Detached usually means the engine is being destroyed.
+        // We can try to stop here to be clean, or let it die with the process.
         AutoPilotService().pause();
         break;
       case AppLifecycleState.inactive:
