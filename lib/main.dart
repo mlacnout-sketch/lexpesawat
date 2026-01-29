@@ -56,7 +56,7 @@ class _ZivpnAppState extends State<ZivpnApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ZIVPN NetReset',
+      title: 'lexpesawat',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,

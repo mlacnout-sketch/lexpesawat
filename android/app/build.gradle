@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.zivpn.netreset"
+        applicationId = "com.lexpesawat.netreset"
         minSdkVersion = 24
         targetSdkVersion = 35
         versionCode = 1

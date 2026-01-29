@@ -51,7 +51,7 @@ class _AutoPilotDashboardState extends State<AutoPilotDashboard> {
           },
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('ZIVPN NetReset'),
+              title: const Text('lexpesawat'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.settings),

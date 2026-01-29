@@ -29,7 +29,7 @@ class KeepAliveService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("ZIVPN Watchdog Active")
+            .setContentTitle("lexpesawat Watchdog Active")
             .setContentText("Monitoring internet connection in background...")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
@@ -46,7 +46,7 @@ class KeepAliveService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "ZIVPN Watchdog Service",
+                "lexpesawat Watchdog Service",
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
